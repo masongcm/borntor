@@ -27,7 +27,8 @@ get_tracks <- function(panel) {
   # extract title
   track_title <- track_row %>%
     html_text() %>% 
-    str_trim() 
+    str_trim() %>%
+    str_to_title()
   # extract URL
   track_url <- track_row %>%
     html_attr('href') %>% str_trim()
@@ -39,9 +40,6 @@ get_tracks <- function(panel) {
   
 }
 tracks <- map(album_panel, get_tracks)
-
-track_url <- "https://springsteenlyrics.com/lyrics.php?song=blindedbythelight"
-
 
 # get name and year of album
 getnameyear <- function(panel) {
@@ -71,25 +69,27 @@ albums <- data.frame(unlist(nameslist)) %>%
 # append tracks as lists
 albums$tracks <- lapply(tracks, as.tibble)
 
-
 # (vectorised) function to get lyrics
+# return list of song lines
 get_lyrics <- function(url) {
-  tryCatch(
+  out <- tryCatch(
     {
       read_html(url) %>%
         html_nodes('.project-detail') %>%
         html_nodes('p') %>%
         html_text() %>%
         extract(2) %>% # second cell of text is lyrics?
-        gsub('\"', "", ., fixed = TRUE) %>% # remove escaped quotes
-        gsub('\n', " ", ., fixed = TRUE) # remove escaped newlines
+        gsub('\"', " ", ., fixed = TRUE) %>% # remove escaped quotes
+        str_split("\n") %>% # split into lines
+        extract2(1)
     },
     error=function(cond) {
       message(paste("URL error:", url))
       message(cond)
-      return("") # return nothing in case of error
+      return(character()) # return nothing in case of error
     }
   )
+  as.list(out)
 }
 get_lyrics <- Vectorize(get_lyrics) 
 
@@ -97,6 +97,8 @@ get_lyrics <- Vectorize(get_lyrics)
 springsteen_lyrics <- albums %>% 
   unnest() %>%
   mutate(lyrics = get_lyrics(url))
+
+sp2 <- 
 
 library(here)
 saveRDS(springsteen_lyrics, file = here("data/springsteen_lyrics.rds"))
